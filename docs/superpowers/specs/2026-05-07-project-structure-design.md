@@ -26,12 +26,19 @@
 
 每新增一个场景，只需：
 
-1. `apps/server/src/routes/<scene>/` — 添加路由
-2. `apps/web/src/pages/<scene>/` — 添加页面
+1. `apps/server/src/routes/<scene>/` — 添加场景路由目录，内部以 `index.ts` 作为该场景的 Hono 子路由，挂载到顶层 `routes/index.ts`
+2. `apps/web/src/pages/<scene>/` — 添加场景页面目录
 3. `packages/shared/src/` — 添加该场景的类型/常量（如需要）
-4. 在 server `routes/index.ts` 注册路由，在 web 首页加导航入口
+4. 在 server 顶层 `routes/index.ts` 注册该场景的子路由，在 web 首页加导航入口
+
+### 路由挂载约定
+
+- `routes/<scene>/index.ts`：创建并导出该场景的 Hono 子路由实例，定义该场景下的所有端点
+- `routes/index.ts`（顶层）：统一导入各场景子路由，挂载到 Hono app 上，如 `app.route('/sse', sseRouter)`
 
 ## 目录结构
+
+目录结构以 SSE 场景为例（首个验证场景）。SSE 场景下会实现多个子用例（基础 demo、模拟 LLM、实时推送、分块传输），每个子用例对应一个独立的路由文件和页面文件，便于单独验证。后续场景按同样模式在各自目录下组织。
 
 ```
 root/
@@ -40,12 +47,12 @@ root/
 │   │   ├── src/
 │   │   │   ├── routes/
 │   │   │   │   ├── sse/                 # SSE 场景路由
-│   │   │   │   │   ├── index.ts         # 路由注册
+│   │   │   │   │   ├── index.ts         # 场景子路由，挂载到顶层 routes/index.ts
 │   │   │   │   │   ├── demo.ts          # 基础 SSE demo
 │   │   │   │   │   ├── llm.ts           # 模拟 LLM 流式回复
 │   │   │   │   │   ├── realtime.ts      # 实时数据推送
 │   │   │   │   │   └── chunked.ts       # 分块传输
-│   │   │   │   └── index.ts             # 路由总注册入口
+│   │   │   │   └── index.ts             # 顶层路由注册，挂载各场景子路由
 │   │   │   ├── middleware/              # 全局中间件（cors、logger 等）
 │   │   │   ├── services/               # 可复用业务逻辑
 │   │   │   └── index.ts                # Hono app 入口
@@ -58,14 +65,13 @@ root/
 │       │   │   ├── home/                # 首页：场景导航列表
 │       │   │   │   └── index.vue
 │       │   │   └── sse/                 # SSE 场景页面
-│       │   │       ├── index.vue        # SSE 场景入口/导航
+│       │   │       ├── index.vue        # SSE 场景入口/子用例导航
 │       │   │       ├── Demo.vue         # 基础 demo
 │       │   │       ├── Llm.vue          # 模拟 LLM
 │       │   │       ├── Realtime.vue     # 实时数据
 │       │   │       └── Chunked.vue      # 分块传输
 │       │   ├── components/              # 跨场景公共组件
 │       │   ├── hooks/                   # 自定义 composables
-│       │   ├── stores/                  # Pinia stores
 │       │   ├── lib/                     # 工具函数
 │       │   └── router/                  # Vue Router 配置
 │       ├── tsconfig.json
@@ -74,12 +80,11 @@ root/
 ├── packages/
 │   ├── shared/
 │   │   ├── src/
-│   │   │   ├── schemas/                 # Zod schema（请求/响应校验）
-│   │   │   ├── types/                   # TypeScript 类型
+│   │   │   ├── types/                   # TypeScript 类型（server 和 web 共用）
 │   │   │   │   └── sse.ts               # SSE 相关类型
-│   │   │   ├── constants/               # 常量与枚举
-│   │   │   │   └── sse.ts               # SSE 相关常量（事件名等）
-│   │   │   ├── utils/                   # 工具函数
+│   │   │   ├── constants/               # 常量与枚举（server 和 web 共用）
+│   │   │   │   └── sse.ts               # SSE 事件名枚举、端点路径常量
+│   │   │   ├── utils/                   # 工具函数（server 和 web 共用）
 │   │   │   └── index.ts                 # 统一导出
 │   │   ├── tsconfig.json
 │   │   └── package.json
@@ -99,8 +104,10 @@ root/
 
 ### SSE 数据流向
 
+SSE 是单向服务端推送协议：客户端发起一次 HTTP GET 建立连接，服务端通过该连接持续推送事件，客户端不通过该连接回传数据。
+
 ```
-web (EventSource) → server (Hono SSE) → web (事件处理)
+web (EventSource) --HTTP GET--> server (Hono SSE) --events--> web (事件处理)
 ```
 
 每个 SSE 场景的数据格式统一，事件名和数据结构定义在 `packages/shared` 中，server 和 web 都从这里导入，保证类型一致。
@@ -117,16 +124,24 @@ enum SseEvent {
 }
 ```
 
+### 流生命周期约定
+
+- **正常结束**：server 推送 `Done` 事件后，主动关闭流；web 收到 `Done` 事件后，调用 `EventSource.close()` 关闭连接，不重连
+- **异常结束**：server 推送 `Error` 事件后，主动关闭流；web 收到 `Error` 事件后，调用 `EventSource.close()` 关闭连接，展示错误状态，不重连
+- **网络中断**：web 的 `EventSource.onerror` 触发（非 server 主动关闭），此时可根据场景决定是否重连；当前阶段统一展示"连接断开"状态，不自动重连
+
 ### shared 导出约定
 
-- `types/sse.ts` — 响应数据的 TypeScript 类型
-- `constants/sse.ts` — 事件名枚举、端点路径常量
+- `types/sse.ts` — 响应数据的 TypeScript 类型，server 和 web 共用
+- `constants/sse.ts` — 事件名枚举、端点路径常量，server 和 web 共用
 - server 和 web 统一从 `@playground/shared` 导入，不在各自 app 里重复定义
 
 ## 错误处理
 
-- **Server**：Hono 全局错误中间件捕获异常，通过 SSE `error` 事件推送给客户端，然后关闭流
-- **Web**：`EventSource` 监听 `onerror`，同时监听自定义 `error` 事件，统一展示错误状态
+- **Server**：Hono 全局错误中间件捕获异常，通过 SSE `Error` 事件推送错误信息给客户端，然后主动关闭流
+- **Web**：
+  - 监听自定义 `error` 事件（server 主动推送的业务错误）：展示错误信息，关闭连接
+  - 监听 `EventSource.onerror`（网络层错误，如连接中断）：展示"连接断开"状态，不自动重连
 
 ## 测试策略
 
