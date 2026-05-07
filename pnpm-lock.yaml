@@ -18,6 +18,15 @@ importers:
         specifier: ^10.0.1
         version: 10.0.1
 
+  packages/shared:
+    devDependencies:
+      '@playground/config':
+        specifier: workspace:*
+        version: link:../config
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+
 packages:
 
   '@eslint/js@10.0.1':
@@ -63,6 +72,11 @@ packages:
     resolution: {integrity: sha512-3xfzXE/yTjhh0S5dIWlE+3E+J9A09REpLI1ZqVh2+HrNZoVzZn0pkvjiRgVK/Ev3PF9XnaTwCntTx+CADWXcyA==}
     hasBin: true
 
+  typescript@5.9.3:
+    resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
+    engines: {node: '>=14.17'}
+    hasBin: true
+
 snapshots:
 
   '@eslint/js@10.0.1': {}
@@ -93,3 +107,5 @@ snapshots:
       '@turbo/linux-arm64': 2.9.9
       '@turbo/windows-64': 2.9.9
       '@turbo/windows-arm64': 2.9.9
+
+  typescript@5.9.3: {}
