@@ -1,4 +1,4 @@
-import { SseEvent } from '@playground/shared'
+import { SseEvent, SseMessageData, SseErrorData } from '@playground/shared'
 
 export interface SseOptions {
   onMessage: (content: string) => void
@@ -11,7 +11,7 @@ export function createSseConnection(url: string, options: SseOptions): () => voi
   const es = new EventSource(url)
 
   es.addEventListener(SseEvent.Message, (e) => {
-    const data = JSON.parse(e.data) as { content: string }
+    const data = JSON.parse(e.data) as SseMessageData
     options.onMessage(data.content)
   })
 
@@ -21,7 +21,11 @@ export function createSseConnection(url: string, options: SseOptions): () => voi
   })
 
   es.addEventListener(SseEvent.Error, (e) => {
-    const data = JSON.parse((e as MessageEvent).data) as { message: string }
+    // Named server event `event: error\ndata: {...}` arrives as a MessageEvent.
+    // Guard against connection-level errors (no .data) — let onerror handle those.
+    const me = e as unknown as MessageEvent<string>
+    if (!me.data) return
+    const data = JSON.parse(me.data) as SseErrorData
     options.onError(data.message)
     es.close()
   })
