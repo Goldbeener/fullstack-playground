@@ -2,3 +2,8 @@ node_modules/
 dist/
 .turbo/
 *.local
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store

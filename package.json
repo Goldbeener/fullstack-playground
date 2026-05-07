@@ -1,12 +1,17 @@
 {
   "name": "playground",
   "private": true,
+  "packageManager": "pnpm@10.9.0",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint"
   },
   "devDependencies": {
-    "turbo": "latest"
+    "turbo": "^2.9.9"
   }
 }
