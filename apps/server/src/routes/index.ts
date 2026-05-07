@@ -1,7 +1,8 @@
 import { Hono } from 'hono'
+import sseRouter from './sse/index.js'
 
 const router = new Hono()
 
-// 场景路由将在此挂载
+router.route('/sse', sseRouter)
 
 export default router
