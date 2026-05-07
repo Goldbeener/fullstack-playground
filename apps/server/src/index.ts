@@ -8,11 +8,10 @@ const app = new Hono()
 
 app.use('*', loggerMiddleware)
 app.use('*', corsMiddleware)
+app.get('/health', (c) => c.json({ status: 'ok' }))
 app.route('/', router)
 
-app.get('/health', (c) => c.json({ status: 'ok' }))
-
 const port = 3000
-console.log(`Server running on http://localhost:${port}`)
-
-serve({ fetch: app.fetch, port })
+serve({ fetch: app.fetch, port }, () => {
+  console.log(`Server running on http://localhost:${port}`)
+})
