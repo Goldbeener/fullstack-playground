@@ -1,6 +1,7 @@
 {
   "extends": "@playground/config/tsconfig/web",
   "compilerOptions": {
+    "noEmit": true,
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
